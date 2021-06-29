@@ -1,0 +1,18 @@
+#!/bin/bash
+quantity=$2
+vmid=$1
+if [ "$(pvesh get /cluster/resources --type vm --output-format yaml| egrep 'qemu|lxc' | grep 235 | awk '{print $2}' | cut -d '/' -f 1)" = "lxc" ]
+then
+  type=pct
+elif [ "$(pvesh get /cluster/resources --type vm --output-format yaml| egrep 'qemu|lxc' | grep 235 | awk '{print $2}' | cut -d '/' -f 1)" = "qemu" ]
+then
+  type=qm
+else
+  echo 'Ошибка выбора типа VMID'
+  exit
+fi
+$type snapshot $vmid pve-snapshot-`date +"%Y%m%d%H%M%s"`
+while [ "$($type listsnapshot 235 | grep pve-snapshot | wc -l)" -gt "$quantity" ]
+do
+  $type delsnapshot $vmid `$type listsnapshot $vmid | grep pve-snapshot | head -1 | awk '{print $2}'`
+done

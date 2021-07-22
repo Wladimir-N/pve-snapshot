@@ -12,8 +12,8 @@ else
   echo 'Ошибка выбора типа VMID'
   exit
 fi
-$type snapshot $vmid pve-snapshot-`date +"%Y%m%d%H%M%s"`
-while [ "$($type listsnapshot $vmid | grep pve-snapshot | wc -l)" -gt "$quantity" ]
+ssh $(pvesh get /cluster/resources --type vm | sed 's/│/#/g' | grep '#' | cut -d '#' -f 2,14 | grep -E " (lxc|qemu)/$vmid +# " | awk '{print $3}') $type snapshot $vmid pve-snapshot-`date +"%Y%m%d%H%M%s"`
+while [ "$(ssh $(pvesh get /cluster/resources --type vm | sed 's/│/#/g' | grep '#' | cut -d '#' -f 2,14 | grep -E " (lxc|qemu)/$vmid +# " | awk '{print $3}') $type listsnapshot $vmid | grep pve-snapshot | wc -l)" -gt "$quantity" ]
 do
-  $type delsnapshot $vmid `$type listsnapshot $vmid | grep pve-snapshot | head -1 | awk '{print $2}'`
+  ssh $(pvesh get /cluster/resources --type vm | sed 's/│/#/g' | grep '#' | cut -d '#' -f 2,14 | grep -E " (lxc|qemu)/$vmid +# " | awk '{print $3}') $type delsnapshot $vmid `$type listsnapshot $vmid | grep pve-snapshot | head -1 | awk '{print $2}'`
 done

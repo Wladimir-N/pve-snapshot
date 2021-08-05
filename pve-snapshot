@@ -1,6 +1,7 @@
 #!/bin/bash
 quantity=$2
 vmid=$1
+name=$3
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 pretype=$(pvesh get /cluster/resources --type vm --output-format yaml| grep ' id' | grep $vmid | awk '{print $2}' | cut -d '/' -f 1)
 if [ "$pretype" = "lxc" ]
@@ -15,9 +16,9 @@ else
 fi
 if [ "$($type config $vmid | grep -E '^lock: ' | wc -l)" -eq "0" ]
 then
-  ssh $(pvesh get /cluster/resources --type vm | sed 's/│/#/g' | grep '#' | cut -d '#' -f 2,14 | grep -E " (lxc|qemu)/$vmid +# " | awk '{print $3}') $type snapshot $vmid pve-snapshot-`date +"%Y%m%d%H%M%s"`
-  while [ "$(ssh $(pvesh get /cluster/resources --type vm | sed 's/│/#/g' | grep '#' | cut -d '#' -f 2,14 | grep -E " (lxc|qemu)/$vmid +# " | awk '{print $3}') $type listsnapshot $vmid | grep pve-snapshot | wc -l)" -gt "$quantity" ]
+  ssh $(pvesh get /cluster/resources --type vm | sed 's/│/#/g' | grep '#' | cut -d '#' -f 2,14 | grep -E " (lxc|qemu)/$vmid +# " | awk '{print $3}') $type snapshot $vmid pve-snapshot${name}-`date +"%Y%m%d%H%M%s"`
+  while [ "$(ssh $(pvesh get /cluster/resources --type vm | sed 's/│/#/g' | grep '#' | cut -d '#' -f 2,14 | grep -E " (lxc|qemu)/$vmid +# " | awk '{print $3}') $type listsnapshot $vmid | grep pve-snapshot${name} | wc -l)" -gt "$quantity" ]
   do
-    ssh $(pvesh get /cluster/resources --type vm | sed 's/│/#/g' | grep '#' | cut -d '#' -f 2,14 | grep -E " (lxc|qemu)/$vmid +# " | awk '{print $3}') $type delsnapshot $vmid `$type listsnapshot $vmid | grep pve-snapshot | head -1 | awk '{print $2}'`
+    ssh $(pvesh get /cluster/resources --type vm | sed 's/│/#/g' | grep '#' | cut -d '#' -f 2,14 | grep -E " (lxc|qemu)/$vmid +# " | awk '{print $3}') $type delsnapshot $vmid `$type listsnapshot $vmid | grep pve-snapshot${name} | head -1 | awk '{print $2}'`
   done
 fi

@@ -14,7 +14,7 @@ else
   echo 'Ошибка выбора типа VMID'
   exit
 fi
-if [ "$(ssh $(pvesh get /cluster/resources --type vm | sed 's/│/#/g' | grep '#' | cut -d '#' -f 2,14 | grep -E " (lxc|qemu)/$vmid +# " | awk '{print $3}') $config $vmid | grep -E '^lock: ' | wc -l)" -eq "0" ]
+if [ "$(ssh $(pvesh get /cluster/resources --type vm | sed 's/│/#/g' | grep '#' | cut -d '#' -f 2,14 | grep -E " (lxc|qemu)/$vmid +# " | awk '{print $3}') $type config $vmid | grep -E '^lock: ' | wc -l)" -eq "0" ]
 then
   ssh $(pvesh get /cluster/resources --type vm | sed 's/│/#/g' | grep '#' | cut -d '#' -f 2,14 | grep -E " (lxc|qemu)/$vmid +# " | awk '{print $3}') $type snapshot $vmid pve-snapshot${name}-`date +"%Y%m%d%H%M%s"`
   while [ "$(ssh $(pvesh get /cluster/resources --type vm | sed 's/│/#/g' | grep '#' | cut -d '#' -f 2,14 | grep -E " (lxc|qemu)/$vmid +# " | awk '{print $3}') $type listsnapshot $vmid | grep pve-snapshot${name} | wc -l)" -gt "$quantity" ]

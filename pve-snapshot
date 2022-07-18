@@ -3,6 +3,7 @@ quantity=$2
 vmid=$1
 name=$3
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export LANG=ru_RU.UTF-8
 pretype=$(pvesh get /cluster/resources --type vm --output-format yaml| grep ' id' | grep $vmid | awk '{print $2}' | cut -d '/' -f 1)
 if [ "$pretype" = "lxc" ]
 then

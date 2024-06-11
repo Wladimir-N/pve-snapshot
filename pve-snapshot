@@ -4,6 +4,25 @@ vmid=$1
 name=$3
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export LANG=ru_RU.UTF-8
+
+# Определяем имя блокировочного файла на основе аргументов
+LOCK_FILE="/tmp/pve-snapshot-${vmid}-${quantity}-${name}.lock"
+
+# Проверяем, существует ли блокировочный файл
+if [ -f "$LOCK_FILE" ]; then
+    # Проверяем, существует ли процесс с PID, указанным в блокировочном файле
+    if ps -p $(cat "$LOCK_FILE") > /dev/null 2>&1; then
+        echo "Скрипт уже выполняется с такими же аргументами: $VM_ID $TIME_INTERVAL $UNIT"
+        exit 1
+    else
+        echo "Найден устаревший блокировочный файл. Удаляем его."
+        rm -f "$LOCK_FILE"
+    fi
+fi
+
+# Создаем новый блокировочный файл с PID текущего процесса
+echo $$ > "$LOCK_FILE"
+
 pretype=$(pvesh get /cluster/resources --type vm --output-format yaml| grep ' id' | grep $vmid | awk '{print $2}' | cut -d '/' -f 1)
 if [ "$pretype" = "lxc" ]
 then
@@ -23,3 +42,6 @@ then
     ssh $(pvesh get /cluster/resources --type vm | sed 's/│/#/g' | grep '#' | cut -d '#' -f 2,15 | grep -E " (lxc|qemu)/$vmid +# " | awk '{print $3}') $type delsnapshot $vmid `ssh $(pvesh get /cluster/resources --type vm | sed 's/│/#/g' | grep '#' | cut -d '#' -f 2,15 | grep -E " (lxc|qemu)/$vmid +# " | awk '{print $3}') $type listsnapshot $vmid | grep pve-snapshot${name} | head -1 | awk '{print $2}'` -force
   done
 fi
+
+# Удаляем блокировочный файл по завершении
+rm -f "$LOCK_FILE"

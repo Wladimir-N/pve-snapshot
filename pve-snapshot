@@ -4,6 +4,7 @@ vmid=$1
 name=$3
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export LANG=ru_RU.UTF-8
+pve=$(pvesh get /cluster/resources --type vm | awk 'BEGIN {FS="│"; OFS="\t"} {print $2, $20}' | grep -E " (lxc|qemu)/$vmid " | awk '{print $2}')
 
 # Определяем имя блокировочного файла на основе аргументов
 LOCK_FILE="/tmp/pve-snapshot-${vmid}-${quantity}-${name}.lock"
@@ -34,12 +35,12 @@ else
   echo 'Ошибка выбора типа VMID'
   exit
 fi
-if [ "$(ssh $(pvesh get /cluster/resources --type vm | sed 's/│/#/g' | grep '#' | cut -d '#' -f 2,15 | grep -E " (lxc|qemu)/$vmid +# " | awk '{print $3}') $type config $vmid | grep -E '^lock: ' | wc -l)" -eq "0" ]
+if [ "$(ssh $pve $type config $vmid | grep -E '^lock: ' | wc -l)" -eq "0" ]
 then
-  ssh $(pvesh get /cluster/resources --type vm | sed 's/│/#/g' | grep '#' | cut -d '#' -f 2,15 | grep -E " (lxc|qemu)/$vmid +# " | awk '{print $3}') $type snapshot $vmid pve-snapshot${name}-`date +"%Y%m%d%H%M%s"`
-  while [ "$(ssh $(pvesh get /cluster/resources --type vm | sed 's/│/#/g' | grep '#' | cut -d '#' -f 2,15 | grep -E " (lxc|qemu)/$vmid +# " | awk '{print $3}') $type listsnapshot $vmid | grep pve-snapshot${name} | wc -l)" -gt "$quantity" ]
+  ssh $pve $type snapshot $vmid pve-snapshot${name}-`date +"%Y%m%d%H%M%s"`
+  while [ "$(ssh $pve $type listsnapshot $vmid | grep pve-snapshot${name} | wc -l)" -gt "$quantity" ]
   do
-    ssh $(pvesh get /cluster/resources --type vm | sed 's/│/#/g' | grep '#' | cut -d '#' -f 2,15 | grep -E " (lxc|qemu)/$vmid +# " | awk '{print $3}') $type delsnapshot $vmid `ssh $(pvesh get /cluster/resources --type vm | sed 's/│/#/g' | grep '#' | cut -d '#' -f 2,15 | grep -E " (lxc|qemu)/$vmid +# " | awk '{print $3}') $type listsnapshot $vmid | grep pve-snapshot${name} | head -1 | awk '{print $2}'` -force
+    ssh $pve $type delsnapshot $vmid `ssh $pve $type listsnapshot $vmid | grep pve-snapshot${name} | head -1 | awk '{print $2}'` -force
   done
 fi
 

@@ -38,7 +38,7 @@ fi
 if [ "$(ssh $pve $type config $vmid | grep -E '^lock: ' | wc -l)" -eq "0" ]
 then
   ssh $pve $type snapshot $vmid pve-snapshot${name}-`date +"%Y%m%d%H%M%s"`
-  while [ "$(ssh $pve $type listsnapshot $vmid | grep pve-snapshot${name} | wc -l)" -gt "$quantity" ]
+  while [ "$(ssh $pve $type listsnapshot $vmid 2>/dev/null | grep pve-snapshot${name} | wc -l)" -gt "$quantity" ]
   do
     ssh $pve $type delsnapshot $vmid `ssh $pve $type listsnapshot $vmid | grep pve-snapshot${name} | head -1 | awk '{print $2}'` -force
   done

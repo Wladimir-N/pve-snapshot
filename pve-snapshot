@@ -1,48 +1,62 @@
 #!/bin/bash
-quantity=$2
-vmid=$1
-name=$3
+
+quantity="$2"
+vmid="$1"
+name="$3"
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export LANG=ru_RU.UTF-8
-pve=$(pvesh get /cluster/resources --type vm | awk 'BEGIN {FS="│"; OFS="\t"} {print $2, $20}' | grep -E " (lxc|qemu)/$vmid " | awk '{print $2}')
 
-# Определяем имя блокировочного файла на основе аргументов
+# Узнаем имя хоста, где крутится VM, через pvesh
+pve=$(pvesh get /cluster/resources --type vm --output-format json | jq -r ".[] | select(.vmid==$vmid) | .node")
+
+if [[ -z "$pve" ]]; then
+    echo "Не удалось найти сервер для VMID $vmid."
+    exit 1
+fi
+
+# Имя блокировочного файла
 LOCK_FILE="/tmp/pve-snapshot-${vmid}-${quantity}-${name}.lock"
 
-# Проверяем, существует ли блокировочный файл
+# Проверяем lock-файл
 if [ -f "$LOCK_FILE" ]; then
-    # Проверяем, существует ли процесс с PID, указанным в блокировочном файле
     if ps -p $(cat "$LOCK_FILE") > /dev/null 2>&1; then
-        echo "Скрипт уже выполняется с такими же аргументами: $VM_ID $TIME_INTERVAL $UNIT"
+        echo "Скрипт уже выполняется с такими же аргументами: $vmid $quantity $name"
         exit 1
     else
         echo "Найден устаревший блокировочный файл. Удаляем его."
         rm -f "$LOCK_FILE"
     fi
 fi
-
-# Создаем новый блокировочный файл с PID текущего процесса
 echo $$ > "$LOCK_FILE"
 
-pretype=$(pvesh get /cluster/resources --type vm --output-format yaml| grep ' id' | grep $vmid | awk '{print $2}' | cut -d '/' -f 1)
-if [ "$pretype" = "lxc" ]
-then
-  type=pct
-elif [ "$pretype" = "qemu" ]
-then
-  type=qm
+pretype=$(pvesh get /cluster/resources --type vm --output-format json | jq -r ".[] | select(.vmid==$vmid) | .type")
+if [ "$pretype" = "lxc" ]; then
+    type="pct"
+elif [ "$pretype" = "qemu" ]; then
+    type="qm"
 else
-  echo 'Ошибка выбора типа VMID'
-  exit
-fi
-if [ "$(ssh $pve $type config $vmid | grep -E '^lock: ' | wc -l)" -eq "0" ]
-then
-  ssh $pve $type snapshot $vmid pve-snapshot${name}-`date +"%Y%m%d%H%M%s"`
-  while [ "$(ssh $pve $type listsnapshot $vmid 2>/dev/null | grep pve-snapshot${name} | wc -l)" -gt "$quantity" ]
-  do
-    ssh $pve $type delsnapshot $vmid `ssh $pve $type listsnapshot $vmid | grep pve-snapshot${name} | head -1 | awk '{print $2}'` -force
-  done
+    echo 'Ошибка выбора типа VMID'
+    rm -f "$LOCK_FILE"
+    exit 1
 fi
 
-# Удаляем блокировочный файл по завершении
+if [ "$(ssh root@$pve $type config $vmid | grep -E '^lock:' | wc -l)" -eq "0" ]; then
+    SNAP_NAME="pve-snapshot${name}-$(date +"%Y%m%d%H%M%S")"
+    ssh root@$pve $type snapshot $vmid "$SNAP_NAME"
+
+    # Получаем только имена релевантных снапшотов
+    snapshot_list=$(ssh root@$pve $type listsnapshot $vmid 2>/dev/null | grep "pve-snapshot${name}" | awk '{print $2}')
+    count=$(echo "$snapshot_list" | wc -l)
+
+    while [ "$count" -gt "$quantity" ]; do
+        oldest_snap=$(echo "$snapshot_list" | head -1)
+        ssh root@$pve $type delsnapshot $vmid "$oldest_snap" -force
+        # Обновляем список и количество
+        snapshot_list=$(ssh root@$pve $type listsnapshot $vmid 2>/dev/null | grep "pve-snapshot${name}" | awk '{print $2}')
+        count=$(echo "$snapshot_list" | wc -l)
+    done
+else
+    echo "VMID $vmid заблокирован, пропущено создание снапшота"
+fi
+
 rm -f "$LOCK_FILE"
